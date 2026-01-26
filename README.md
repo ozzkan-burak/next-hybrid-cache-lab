@@ -26,12 +26,12 @@ graph TD
     end
 
     subgraph Server [Next.js Server]
-        Shell[ Static Shell<br/>(Cache HIT)]
-        Dynamic[ Dynamic Components<br/>(No-Store)]
+        Shell[" Static Shell<br/>(Cache HIT)"]
+        Dynamic[" Dynamic Components<br/>(No-Store)"]
     end
 
     subgraph Data [Data Sources]
-        DB[(Product DB)]
+        DB[("Product DB")]
         PriceAPI{Price Service}
         StockAPI{Stock Service}
     end
