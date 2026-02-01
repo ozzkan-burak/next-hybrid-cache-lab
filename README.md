@@ -1,99 +1,46 @@
 # ⚡ Next.js Hybrid Cache Lab: Static Shell + Dynamic Holes
 
-Bu proje, Next.js (App Router) kullanarak **"Partial Prerendering" (PPR)** ve **"Hybrid Caching"** mimarilerini simüle eden deneysel bir e-ticaret laboratuvarıdır.
+Bu proje, Next.js (App Router) kullanarak **"Partial Prerendering" (PPR)** mimarisini simüle eden ve **"Streaming SSR"** yeteneklerini uç sınırlarda test eden bir laboratuvar çalışmasıdır.
 
 ## Projenin Amacı
-Geleneksel web geliştirmede genellikle iki uç nokta vardır:
-1.  **Tamamen Statik (SSG):** Çok hızlıdır ama veri bayat olabilir (Örn: Stok bilgisi).
-2.  **Tamamen Dinamik (SSR):** Veri günceldir ama her istekte sunucu yorulur ve yavaştır.
 
-Bu projede **üçüncü bir yol** izliyoruz:
-Sayfanın %80'ini (Ürün detayları, resimler) **Statik (Cache)** olarak sunarken, %20'sini (Fiyat, Stok) **Dinamik (No-Cache)** olarak sunarak hem hızı hem de güncelliği aynı anda sağlıyoruz.
+Modern web uygulamalarında "Veri Güncelliği" (Freshness) ile "Yükleme Hızı" (Performance) genellikle birbiriyle çelişir. Bu projede şu mimariyi uyguladık:
 
-## Mimari Yaklaşım: "Static Shell"
+1.  **Static Shell (Anında Yükleme):** Sayfanın iskeleti, başlığı ve layout'u sunucudan milisaniyeler içinde gelir.
+2.  **Dynamic Holes (Streaming):** Fiyat ve Stok gibi ağır veriler, sayfa yüklendikten sonra açık HTTP bağlantısı üzerinden "akar" (Stream).
+3.  **Visual Feedback Control:** Next.js'in "Soft Navigation" davranışını manipüle ederek, kullanıcıya her güncellemede Loading Skeleton'ları göstermeyi zorunlu kıldık.
 
-Sayfa, bir "kabuk" (shell) ve içindeki "delikler" (holes) olarak düşünülür.
+## Mimari Yaklaşım
 
-* ** Static Shell:** Build anında oluşturulur. CDN'den anında döner. (Header, Footer, Ürün Açıklaması, Görseller)
-* ** Dynamic Holes:** Kullanıcı sayfayı istediği an sunucuda hesaplanır. (Fiyat, Stok, Kişiye Özel İndirimler)
+Sayfa iki ana katmandan oluşur:
+
+- **Static Shell:** `fakeDb`'den senkron veri çeker. Bloklamaz. Anında render olur.
+- **Dynamic Holes:** `api.ts` içindeki yapay gecikmeli (2s - 3.5s) servisleri bekler. `Suspense` ile sarmalanmıştır.
 
 ### Mimari Diyagramı
 
 ```mermaid
 graph TD
-    subgraph Client [Browser]
+    subgraph Browser [Client / Browser]
         UI[User Interface]
     end
 
-    subgraph Server [Next.js Server]
-        Shell[" Static Shell<br/>(Cache HIT)"]
-        Dynamic[" Dynamic Components<br/>(No-Store)"]
+    subgraph NextServer [Next.js Server]
+        Shell["Static Shell<br/>(Instant Render)"]
+        Stream1["Price Component<br/>(2000ms Delay)"]
+        Stream2["Stock Component<br/>(3500ms Delay)"]
     end
 
-    subgraph Data [Data Sources]
-        DB[("Product DB")]
-        PriceAPI{Price Service}
-        StockAPI{Stock Service}
-    end
+    UI -->|1. Request Page| NextServer
+    NextServer -->|2. Send HTML Head & Shell| UI
 
-    %% Akışlar
-    UI -->|1. Request Page| Server
-    Shell -.->|Build Time| DB
-    Server -->|2. Return Instant HTML| UI
-    
-    Dynamic -->|Runtime| PriceAPI
-    Dynamic -->|Runtime| StockAPI
-    
-    Dynamic -.->|3. Stream Data| UI
-    
+    NextServer -.->|3. Stream Price Data| Stream1
+    NextServer -.->|4. Stream Stock Data| Stream2
+
+    Stream1 -.->|Socket Push| UI
+    Stream2 -.->|Socket Push| UI
+
     style Shell fill:#e8f5e9,stroke:#2e7d32,color:#000
-    style Dynamic fill:#ffebee,stroke:#c62828,color:#000
+    style Stream1 fill:#ffebee,stroke:#c62828,color:#000
+    style Stream2 fill:#ffebee,stroke:#c62828,color:#000
 ```
-
-sequenceDiagram
-    participant User
-    participant Edge as CDN / Edge Cache
-    participant Server as Next.js Server
-    participant DB as Database/API
-
-    Note over User, DB: ⚡ HYBRID REQUEST FLOW
-    
-    User->>Edge: GET /product/sneakers-123
-    
-    rect rgb(240, 255, 240)
-        Note over Edge: 🟢 STATIC PART (Instant)
-        Edge-->>User: Return HTML Shell (Nav, Layout, Images)
-        Note right of User: Kullanıcı sayfayı anında görür (FCP)
-    end
-    
-    rect rgb(255, 240, 240)
-        Note over Server: 🔴 DYNAMIC PART (Streaming)
-        Edge->>Server: Execute Dynamic Holes
-        par Fetch Live Data
-            Server->>DB: Get Live Price
-            Server->>DB: Get Real-time Stock
-        end
-        DB-->>Server: Data Received
-        Server-->>User: Stream <Suspense> Content (Price & Stock)
-        Note right of User: Fiyat ve Stok kutuları yüklenir (LCP)
-    end
-
-Kullanılan Teknolojiler
-Framework: Next.js 15 (App Router)
-
-Architecture: React Server Components (RSC)
-
-Streaming: React Suspense & Streaming SSR
-
-Styling: Tailwind CSS
-
-Language: TypeScript
-
-Laboratuvar Senaryoları
-Bu repo üzerinde şu senaryolar test edilecektir:
-
-The Shell Strategy: layout.tsx ve ürün açıklamasını statik hale getirmek.
-
-The Holes: Fiyat ve Stok bileşenlerini cookies() veya no-store ile dinamik hale getirmek.
-
-Artificial Delay: Dinamik kısımlara yapay gecikme ekleyerek "Streaming" efektini gözlemlemek.
