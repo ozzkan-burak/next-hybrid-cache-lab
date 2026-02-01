@@ -33,7 +33,7 @@ export default function AdminPanel() {
         <form action={handleSubmit} className="flex gap-3">
           <input
             name="title"
-            className="text-white bg-white px-3 py-2 rounded flex-1 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="text-white border-white px-3 py-2 rounded flex-1 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="Yeni ürün adı girin..."
             disabled={isPending}
             autoComplete="off"
